@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Behavior Rules
+
+- **Communication:** Always use caveman mode (terse, no filler, fragments OK). Never use pleasantries or hedging.
+- **Sub-agents:** Only spawn sub-agents for mid/heavy tasks (multi-file refactors, full-feature implementations, deep analysis). Simple reads, edits, lookups, single-file fixes — do directly without delegation.
+
 ## What This Is
 
 Mindgoodizer is a local-first single-user web app. A user submits a raw project idea; it runs through a pool of critical LLM "filter" agents (Claude API) in parallel, then an Orchestrator synthesizes their verdicts into a final report. No cloud backend, no auth, no multi-user.
