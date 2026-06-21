@@ -14,6 +14,7 @@ export function Dashboard() {
 
   return (
     <section className="dashboard">
+      <OrchestratorCard orchState={orchestrator} />
       <div className="agent-grid">
         {config.map((id) => (
           <AgentCard
@@ -25,7 +26,6 @@ export function Dashboard() {
           />
         ))}
       </div>
-      <OrchestratorCard orchState={orchestrator} />
     </section>
   )
 }
