@@ -40,8 +40,11 @@ Orchestrator. Local-first, single-user, no cloud backend.
    ▼
 [Sidecar] validates input → opens SSE stream
    │
-   ├─ Promise.allSettled over N agent calls (parallel, streaming each)
-   │     each agent → Claude API (stream:true)
+   ├─ Haiku classifies idea heaviness: "light" | "heavy"
+   │     (single non-streaming call, ~200 tokens, fast)
+   │
+   ├─ Promise.allSettled over N filter agent calls (parallel, streaming each)
+   │     each agent → Claude API claude-sonnet-4-6 (stream:true)
    │        every token → SSE event { agent, type:"delta", text }
    │        on done     → SSE event { agent, type:"done", result }
    │        on fail     → SSE event { agent, type:"error", message }
@@ -49,6 +52,7 @@ Orchestrator. Local-first, single-user, no cloud backend.
    ▼  (after all settled)
 [Sidecar] builds orchestrator input = { idea, [agent results that succeeded] }
    │     → Claude API (Orchestrator, stream:true)
+   │        model: claude-opus-4-8 if heavy, claude-sonnet-4-6 if light
    │        → SSE events { agent:"orchestrator", ... }
    ▼
 [Frontend] renders live cards; on orchestrator done →

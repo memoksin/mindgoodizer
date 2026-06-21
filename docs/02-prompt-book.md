@@ -143,6 +143,23 @@ Output ONLY valid JSON:
 - Temperature: filter agents 0.7 (sharp diverse takes); Orchestrator 0.3
   (consistent synthesis).
 - Max tokens: filters ~1500, Orchestrator ~2500.
-- Model: `claude-opus-4-8` for Orchestrator (hard reasoning); filters can use
-  `claude-sonnet-4-6` for speed/cost. ponytail: drop all to Sonnet if latency
-  matters more than depth.
+
+## Model routing
+
+| Role | Model | Rationale |
+|------|-------|-----------|
+| Idea classifier | `claude-haiku-4-5-20251001` | Single cheap non-streaming call; classifies idea as `"light"` or `"heavy"` before filter agents start. |
+| Filter agents (all 7) | `claude-sonnet-4-6` | Best balance of reasoning depth and speed; runs in parallel so cost scales linearly. |
+| Orchestrator (light idea) | `claude-sonnet-4-6` | Sufficient synthesis depth for straightforward ideas. |
+| Orchestrator (heavy idea) | `claude-opus-4-8` | Deepest reasoning reserved for complex, multi-dimensional ideas. |
+
+Classifier prompt (Haiku, non-streaming, ~200 tokens):
+```
+Given this raw project idea, classify its complexity.
+"heavy" = multiple interacting systems, regulated domains, novel/unproven tech,
+or deep cross-domain reasoning required to evaluate properly.
+"light" = straightforward with clear analogues.
+Output ONLY valid JSON: { "heaviness": "light" | "heavy" }
+
+Idea: {idea}
+```
