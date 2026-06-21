@@ -13,20 +13,19 @@ Orchestrator. Local-first, single-user, no cloud backend.
 | Option | Verdict | Why |
 |--------|---------|-----|
 | Pure client-side React calling Anthropic SDK from browser | ❌ Rejected | API key ships inside client JS (readable in devtools/bundle). SDK refuses browser calls unless you set `dangerouslyAllowBrowser`/`anthropic-dangerous-direct-browser-access`, which exists precisely because it's unsafe. Also no place to centralize retry/timeout/rate-limit logic. |
-| React + local Node sidecar (Fastify, ~80–120 LOC) | ✅ **Chosen** | Key stays in `.env` server-side (consumed by Claude CLI). One streaming proxy endpoint. CORS trivial (same machine). Sidecar owns concurrency, timeouts, partial-failure handling. |
+| React + local Node sidecar (Fastify, ~80–120 LOC) | ✅ **Chosen** | Claude CLI handles auth via your subscription. One streaming proxy endpoint. CORS trivial (same machine). Sidecar owns concurrency, timeouts, partial-failure handling. |
 | Full framework backend (Nest, etc.) | ❌ Overkill | YAGNI for a single-user local tool. |
 
 **Stack:**
 - Frontend: Vite + React 18 + TypeScript. State: `useReducer` + context (single screen, no Redux).
-- Sidecar: Node + Fastify + `claude` CLI (spawned via `child_process`). One file. Streams via SSE. No SDK dependency — CLI handles auth via `ANTHROPIC_API_KEY` in env.
+- Sidecar: Node + Fastify + `claude` CLI (spawned via `child_process`). One file. Streams via SSE. No SDK dependency — CLI handles auth via your Claude subscription.
 - Persistence: **IndexedDB** (via `idb`), not LocalStorage — reports are large and LocalStorage's ~5MB string cap + sync API don't fit. IndexedDB is the native platform DB; no ORM.
 - Run: `bun run dev` starts Vite (5173) + sidecar (8787) concurrently.
 
 ```
 ~/mindgoodizer
-├── server/index.ts        # sidecar: /api/run (SSE), holds ANTHROPIC_API_KEY
+├── server/index.ts        # sidecar: /api/run (SSE)
 ├── src/                   # React app
-├── .env                   # ANTHROPIC_API_KEY=...  (gitignored)
 └── prompts/               # the 8 system prompts (see doc 02)
 ```
 
@@ -128,8 +127,7 @@ receives only successful agent outputs; failed agents are passed as explicit
 
 ## 5. Local Execution Strategy
 
-1. `cp .env.example .env` → paste `ANTHROPIC_API_KEY`.
-2. `bun install && bun run dev` (concurrently runs sidecar + Vite).
+1. `bun install && bun run dev` (concurrently runs sidecar + Vite).
 3. Open `localhost:5173`. Sidecar at `localhost:8787` is the only network egress.
 4. No auth, no DB server, no Docker. Everything else lives in the browser.
 

@@ -36,9 +36,6 @@ No cloud backend. No account. Your API key stays on your machine.
 ## Setup
 
 ```bash
-cp .env.example .env
-# Add your ANTHROPIC_API_KEY to .env
-
 bun install
 bun run dev     # Vite on :5173 + sidecar on :8787
 ```
@@ -69,4 +66,4 @@ Open `http://localhost:5173`.
 ## Requirements
 
 - [Bun](https://bun.sh) (or Node 20+)
-- `ANTHROPIC_API_KEY` with Claude API access
+- [Claude CLI](https://claude.ai/download) with an active Claude subscription (the sidecar spawns `claude` directly — no API key needed)
