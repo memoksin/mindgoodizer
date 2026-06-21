@@ -1,0 +1,123 @@
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+.env.production.local
+.env.development.local
+.env.test.local
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+npm-debug.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs & dist
+dist/
+build/
+out/
+.next/
+.nuxt/
+coverage/
+.cache/
+
+# Runtime & logs
+*.log
+*.logs
+logs/
+temp/
+tmp/
+*.pid
+*.pid.lock
+
+# IDE & Editor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+*.code-workspace
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Test coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Local development
+.eslintcache
+.stylelintcache
+.prettierignore
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Module resolution cache
+.pnp
+.pnp.js
+
+# Misc local files
+.history/
+.viminfo
+*.bak
+*.swp
+*.swo
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# API responses & cache
+.cache/
+tmp/
+temp/
+
+# Credentials & security
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+*.jks
+
+# IDE metadata
+.eslintignore
+.prettierignore
+
+# Compiled files
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+
+# OS specific
+.env.*.encrypted
+secrets/
+private/
+sensitive/
