@@ -13,14 +13,14 @@ Orchestrator. Local-first, single-user, no cloud backend.
 | Option | Verdict | Why |
 |--------|---------|-----|
 | Pure client-side React calling Anthropic SDK from browser | ❌ Rejected | API key ships inside client JS (readable in devtools/bundle). SDK refuses browser calls unless you set `dangerouslyAllowBrowser`/`anthropic-dangerous-direct-browser-access`, which exists precisely because it's unsafe. Also no place to centralize retry/timeout/rate-limit logic. |
-| React + local Node sidecar (Fastify, ~80–120 LOC) | ✅ **Chosen** | Key stays in `.env` server-side. One streaming proxy endpoint. CORS trivial (same machine). Sidecar owns concurrency, timeouts, partial-failure handling. |
+| React + local Node sidecar (Fastify, ~80–120 LOC) | ✅ **Chosen** | Key stays in `.env` server-side (consumed by Claude CLI). One streaming proxy endpoint. CORS trivial (same machine). Sidecar owns concurrency, timeouts, partial-failure handling. |
 | Full framework backend (Nest, etc.) | ❌ Overkill | YAGNI for a single-user local tool. |
 
 **Stack:**
 - Frontend: Vite + React 18 + TypeScript. State: `useReducer` + context (single screen, no Redux).
-- Sidecar: Node + Fastify + `@anthropic-ai/sdk`. One file. Streams via SSE.
+- Sidecar: Node + Fastify + `claude` CLI (spawned via `child_process`). One file. Streams via SSE. No SDK dependency — CLI handles auth via `ANTHROPIC_API_KEY` in env.
 - Persistence: **IndexedDB** (via `idb`), not LocalStorage — reports are large and LocalStorage's ~5MB string cap + sync API don't fit. IndexedDB is the native platform DB; no ORM.
-- Run: `npm run dev` starts Vite (5173) + sidecar (8787) concurrently.
+- Run: `bun run dev` starts Vite (5173) + sidecar (8787) concurrently.
 
 ```
 ~/mindgoodizer
@@ -40,19 +40,20 @@ Orchestrator. Local-first, single-user, no cloud backend.
    ▼
 [Sidecar] validates input → opens SSE stream
    │
-   ├─ Haiku classifies idea heaviness: "light" | "heavy"
-   │     (single non-streaming call, ~200 tokens, fast)
+   ├─ claude CLI classifies idea heaviness: "light" | "heavy"
+   │     (spawn claude -p <prompt> --model claude-haiku-4-5-20251001 --output-format json, ~200 tokens, fast)
    │
    ├─ Promise.allSettled over N filter agent calls (parallel, streaming each)
-   │     each agent → Claude API claude-sonnet-4-6 (stream:true)
+   │     each agent → spawn claude -p <prompt> --model claude-sonnet-4-6 --output-format stream-json
    │        every token → SSE event { agent, type:"delta", text }
    │        on done     → SSE event { agent, type:"done", result }
    │        on fail     → SSE event { agent, type:"error", message }
    │
    ▼  (after all settled)
 [Sidecar] builds orchestrator input = { idea, [agent results that succeeded] }
-   │     → Claude API (Orchestrator, stream:true)
-   │        model: claude-opus-4-8 if heavy, claude-sonnet-4-6 if light
+   │     → spawn claude -p <prompt> --output-format stream-json
+   │        --model claude-opus-4-8   (if heavy)
+   │        --model claude-sonnet-4-6 (if light)
    │        → SSE events { agent:"orchestrator", ... }
    ▼
 [Frontend] renders live cards; on orchestrator done →
@@ -81,8 +82,7 @@ receives only successful agent outputs; failed agents are passed as explicit
 - **Partial failure:** Orchestrator still runs if ≥1 filter agent succeeded.
   If 0 succeed → surface error, skip orchestrator. Report records which agents
   failed.
-- **Retries:** SDK has built-in retry on 429/5xx; leave default + one manual
-  guard. ponytail: SDK retry covers most of it.
+- **Retries:** CLI exits non-zero on 429/5xx; sidecar catches `proc.on('error')` and emits error event. ponytail: one client-side retry on JSON parse failure covers the common case.
 - **Concurrency cap:** max 7 filter agents is well under typical tier limits;
   no client-side queue needed. ponytail: add p-limit only if you hit 429s.
 
@@ -129,7 +129,7 @@ receives only successful agent outputs; failed agents are passed as explicit
 ## 5. Local Execution Strategy
 
 1. `cp .env.example .env` → paste `ANTHROPIC_API_KEY`.
-2. `npm install && npm run dev` (concurrently runs sidecar + Vite).
+2. `bun install && bun run dev` (concurrently runs sidecar + Vite).
 3. Open `localhost:5173`. Sidecar at `localhost:8787` is the only network egress.
 4. No auth, no DB server, no Docker. Everything else lives in the browser.
 

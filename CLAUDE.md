@@ -14,7 +14,7 @@ Mindgoodizer is a local-first single-user web app. A user submits a raw project 
 ## Planned Stack
 
 - **Frontend:** Vite + React 18 + TypeScript. State via `useReducer` + context (no Redux — single screen).
-- **Sidecar:** Node + Fastify + `@anthropic-ai/sdk`. One file (`server/index.ts`). Streams via SSE. Holds `ANTHROPIC_API_KEY`.
+- **Sidecar:** Node + Fastify + `claude` CLI (spawned via `child_process`). One file (`server/index.ts`). Streams via SSE. `ANTHROPIC_API_KEY` consumed by CLI, not SDK.
 - **Persistence:** IndexedDB via `idb` (not LocalStorage — reports are large).
 - **Dev runner:** `concurrently` starts both processes.
 
@@ -24,8 +24,8 @@ Why a sidecar instead of pure browser: API key must stay server-side; sidecar ow
 
 ```bash
 cp .env.example .env      # add ANTHROPIC_API_KEY
-npm install
-npm run dev               # Vite on :5173 + sidecar on :8787
+bun install
+bun run dev               # Vite on :5173 + sidecar on :8787
 ```
 
 ## Architecture

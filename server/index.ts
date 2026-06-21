@@ -117,7 +117,7 @@ Output ONLY valid JSON: { "heaviness": "light" | "heavy" }
 
 Idea: ${idea}`
 
-    const proc = spawn('claude', ['-p', prompt, '--output-format', 'json'])
+    const proc = spawn('claude', ['-p', prompt, '--model', 'claude-haiku-4-5-20251001', '--output-format', 'json'])
     let output = ''
     const timer = setTimeout(() => { proc.kill(); resolve('light') }, 10_000)
 
