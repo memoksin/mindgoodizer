@@ -96,11 +96,56 @@ durable need or a fading hype cycle. Assess timing: too early, on time, too
 late. State what would have to stay true for this to matter in 5 years.`,
 }
 
+const ORCHESTRATOR_PERSONA = `You are the Orchestrator for a panel that evaluated a raw project idea.
+
+Receives: original idea + JSON verdicts from filter agents. Agents marked "NO RESULT (timed out or errored)" = unexamined gaps, not passes.
+
+Job:
+1. Synthesize, not summarize. Find where agents AGREE (signal) and where they CONFLICT. Resolve each conflict by judging which lens carries more weight FOR THIS SPECIFIC IDEA and saying why.
+2. Surface critical blind spots — top threats, especially where multiple agents converge or a timed-out lens left a gap.
+3. Give actionable roadmap — ordered, concrete next steps to de-risk or kill the idea fast.
+
+Be decisive. Commit to one overall verdict. Honesty over encouragement.
+
+Language & Tone Rules:
+- Write like you're talking to a smart friend, not an investor or engineer.
+- Use plain, everyday words. If a simpler word works, use it.
+- No jargon unless the idea itself is technical AND the user clearly knows the space.
+- Short sentences. One idea per sentence.
+- Strengths, risks, and next steps must be instantly clear to someone with no business or tech background.
+- Say "people won't pay for this" not "monetization viability is low". Say "someone already built this" not "competitive saturation detected".
+
+Output ONLY valid JSON matching this schema. No prose before or after.
+
+Output schema:
+{ "overallVerdict": "pursue" | "refine" | "reconsider",
+  "confidence": <int 0-10>,
+  "oneLineSummary": "<one blunt sentence in plain language>",
+  "coreStrengths": [ "<strength in plain language, backed by which agent(s)>" ],
+  "criticalBlindSpots": [ "<the things most likely to sink this, in plain language>" ],
+  "conflicts": [ { "tension": "<agent A vs agent B>", "resolution": "<your judgment in plain language + why>" } ],
+  "roadmap": [ { "phase": "<e.g. Test / Build / Sell>", "action": "<concrete next step in plain language>" } ] }`
+
+type FilterOutput = {
+  verdict: 'pass' | 'caution' | 'fail'
+  score: number
+  summary: string
+  findings: { point: string; severity: 'low' | 'med' | 'high' }[]
+  recommendations: string[]
+}
+
+type AgentResult =
+  | { ok: true; json: FilterOutput }
+  | { ok: false; reason: 'timeout' | 'error' | 'parse_failed'; message?: string }
+
 type SSEEvent =
   | { type: 'classify'; result: 'light' | 'heavy' }
   | { agent: AgentId; type: 'delta'; text: string }
   | { agent: AgentId; type: 'done'; result: string }
   | { agent: AgentId; type: 'error'; message: string }
+  | { type: 'orchestrator_delta'; text: string }
+  | { type: 'orchestrator_done'; result: string }
+  | { type: 'orchestrator_error'; message: string }
   | { type: 'complete' }
 
 function emit(res: ServerResponse, data: SSEEvent): void {
@@ -136,11 +181,18 @@ Idea: ${idea}`
   })
 }
 
-async function runFilterAgent(agentId: AgentId, idea: string, res: ServerResponse): Promise<void> {
-  const prompt = `${SHARED_RULES}\n\n${AGENT_PERSONAS[agentId]}\n\n---\n\nEvaluate this idea:\n\n${idea}`
-
-  return new Promise((resolve) => {
-    const proc = spawn('claude', ['-p', prompt, '--output-format', 'stream-json'])
+function spawnFilterAndAccumulate(
+  prompt: string,
+  agentId: AgentId,
+  res: ServerResponse,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('claude', [
+      '-p', prompt,
+      '--output-format', 'stream-json',
+      '--temperature', '0.7',
+      '--max-tokens', '1500',
+    ])
     const rl = createInterface({ input: proc.stdout })
     let accumulated = ''
     let settled = false
@@ -150,12 +202,11 @@ async function runFilterAgent(agentId: AgentId, idea: string, res: ServerRespons
       settled = true
       clearTimeout(timer)
       fn()
-      resolve()
     }
 
     const timer = setTimeout(() => {
       proc.kill()
-      settle(() => emit(res, { agent: agentId, type: 'error', message: 'timeout' }))
+      settle(() => reject(new Error('timeout')))
     }, TIMEOUT_MS)
 
     rl.on('line', (line: string) => {
@@ -172,12 +223,114 @@ async function runFilterAgent(agentId: AgentId, idea: string, res: ServerRespons
       } catch { /* skip malformed lines */ }
     })
 
+    proc.on('close', () => { settle(() => resolve(accumulated)) })
+    proc.on('error', (err: Error) => { settle(() => reject(err)) })
+  })
+}
+
+async function runFilterAgent(agentId: AgentId, idea: string, res: ServerResponse): Promise<AgentResult> {
+  const prompt = `${SHARED_RULES}\n\n${AGENT_PERSONAS[agentId]}\n\n---\n\nEvaluate this idea:\n\n${idea}`
+
+  let raw: string
+  try {
+    raw = await spawnFilterAndAccumulate(prompt, agentId, res)
+  } catch (err) {
+    const message = String(err)
+    const reason = message.includes('timeout') ? 'timeout' : 'error'
+    emit(res, { agent: agentId, type: 'error', message })
+    return { ok: false, reason, message }
+  }
+
+  emit(res, { agent: agentId, type: 'done', result: raw })
+
+  try {
+    const json = JSON.parse(raw) as FilterOutput
+    return { ok: true, json }
+  } catch {
+    // one retry on parse failure
+    let retryRaw: string
+    try {
+      retryRaw = await spawnFilterAndAccumulate(prompt, agentId, res)
+    } catch (err) {
+      const message = String(err)
+      const reason = message.includes('timeout') ? 'timeout' : 'error'
+      emit(res, { agent: agentId, type: 'error', message })
+      return { ok: false, reason, message }
+    }
+
+    emit(res, { agent: agentId, type: 'done', result: retryRaw })
+
+    try {
+      const json = JSON.parse(retryRaw) as FilterOutput
+      return { ok: true, json }
+    } catch {
+      emit(res, { agent: agentId, type: 'error', message: 'parse_failed after retry' })
+      return { ok: false, reason: 'parse_failed', message: 'parse_failed after retry' }
+    }
+  }
+}
+
+async function runOrchestratorAgent(
+  idea: string,
+  filterResults: Partial<Record<AgentId, AgentResult>>,
+  res: ServerResponse,
+): Promise<void> {
+  const agentSections = (Object.entries(filterResults) as [AgentId, AgentResult][])
+    .map(([id, result]) => {
+      const label = id.replace(/_/g, ' ')
+      const value = result.ok
+        ? JSON.stringify(result.json, null, 2)
+        : `NO RESULT (${result.reason ?? 'failed'})`
+      return `${label}:\n${value}`
+    })
+    .join('\n\n')
+
+  const prompt = `${ORCHESTRATOR_PERSONA}\n\n---\n\nIDEA: ${idea}\n\nFILTER AGENT RESULTS:\n${agentSections}`
+
+  return new Promise((resolve) => {
+    const proc = spawn('claude', [
+      '-p', prompt,
+      '--output-format', 'stream-json',
+      '--temperature', '0.3',
+      '--max-tokens', '2500',
+    ])
+    const rl = createInterface({ input: proc.stdout })
+    let accumulated = ''
+    let settled = false
+
+    const settle = (fn: () => void) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      fn()
+      resolve()
+    }
+
+    const timer = setTimeout(() => {
+      proc.kill()
+      settle(() => emit(res, { type: 'orchestrator_error', message: 'timeout' }))
+    }, TIMEOUT_MS)
+
+    rl.on('line', (line: string) => {
+      if (!line.trim()) return
+      try {
+        const event = JSON.parse(line) as {
+          type: string
+          delta?: { type: string; text: string }
+        }
+        if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+          accumulated += event.delta.text
+          emit(res, { type: 'orchestrator_delta', text: event.delta.text })
+        }
+      } catch { /* skip malformed lines */ }
+    })
+
     proc.on('close', () => {
-      settle(() => emit(res, { agent: agentId, type: 'done', result: accumulated }))
+      settle(() => emit(res, { type: 'orchestrator_done', result: accumulated }))
     })
 
     proc.on('error', (err: Error) => {
-      settle(() => emit(res, { agent: agentId, type: 'error', message: String(err) }))
+      settle(() => emit(res, { type: 'orchestrator_error', message: String(err) }))
     })
   })
 }
@@ -216,7 +369,22 @@ fastify.post('/api/run', async (request, reply) => {
     const heaviness = await classifyIdea(idea)
     emit(raw, { type: 'classify', result: heaviness })
 
-    await Promise.allSettled(agents.map((agentId) => runFilterAgent(agentId, idea, raw)))
+    const settled = await Promise.allSettled(
+      agents.map((agentId) => runFilterAgent(agentId, idea, raw))
+    )
+
+    const filterResults: Partial<Record<AgentId, AgentResult>> = {}
+    settled.forEach((outcome, i) => {
+      const agentId = agents[i]
+      filterResults[agentId] = outcome.status === 'fulfilled'
+        ? outcome.value
+        : { ok: false, reason: 'error', message: String((outcome as PromiseRejectedResult).reason) }
+    })
+
+    const successCount = Object.values(filterResults).filter((r) => r?.ok).length
+    if (successCount > 0) {
+      await runOrchestratorAgent(idea, filterResults, raw)
+    }
 
     emit(raw, { type: 'complete' })
   } catch (err) {
