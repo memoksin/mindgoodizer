@@ -49,6 +49,7 @@ export interface AppState {
   agents: Record<AgentId, AgentState>
   orchestrator: OrchestratorState
   classification?: 'light' | 'heavy'
+  useOpus: boolean
 }
 
 export interface HistoryRun {

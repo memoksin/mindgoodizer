@@ -1,4 +1,4 @@
-import { createContext, Dispatch, useReducer } from 'react'
+import { createContext, Dispatch, useReducer, useState, useCallback } from 'react'
 import './App.css'
 import { ControlCenter } from './components/ControlCenter'
 import { Dashboard } from './components/Dashboard'
@@ -21,7 +21,9 @@ export const AppContext = createContext<ContextValue>({
 
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
-  const { run } = useSSE(state, dispatch)
+  const [error, setError] = useState<string | null>(null)
+  const onError = useCallback((msg: string) => setError(msg), [])
+  const { run } = useSSE(state, dispatch, onError)
 
   return (
     <AppContext.Provider value={{ state, dispatch, run }}>
@@ -30,6 +32,12 @@ export default function App() {
           <div />
           <HistoryPanel />
         </header>
+        {error && (
+          <div className="error-banner" role="alert">
+            <span>⚠ {error}</span>
+            <button className="btn btn--ghost btn--sm" onClick={() => setError(null)}>✕</button>
+          </div>
+        )}
         <main className="app-main">
           <ControlCenter />
           <Dashboard />

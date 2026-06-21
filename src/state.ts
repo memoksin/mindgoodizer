@@ -11,6 +11,7 @@ import {
 export type Action =
   | { type: 'SET_IDEA'; idea: string }
   | { type: 'TOGGLE_AGENT'; id: AgentId }
+  | { type: 'TOGGLE_OPUS' }
   | { type: 'RUN_START' }
   | { type: 'CLASSIFY'; result: 'light' | 'heavy' }
   | { type: 'AGENT_DELTA'; agent: AgentId; text: string }
@@ -49,12 +50,16 @@ export const initialState: AppState = {
   config: [...CORE_AGENTS],
   agents: makeAgentMap(),
   orchestrator: { status: 'idle', partial: '' },
+  useOpus: false,
 }
 
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'SET_IDEA':
       return { ...state, idea: action.idea }
+
+    case 'TOGGLE_OPUS':
+      return { ...state, useOpus: !state.useOpus }
 
     case 'TOGGLE_AGENT': {
       const inConfig = state.config.includes(action.id)
@@ -184,6 +189,7 @@ export function reducer(state: AppState, action: Action): AppState {
         config: run.config,
         agents,
         orchestrator: { status: 'done', partial: '', result: run.report },
+        useOpus: state.useOpus,
       }
     }
 

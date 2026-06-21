@@ -3,7 +3,11 @@ import { Action } from './state'
 import { AgentId, AppState, FilterOutput, OrchestratorOutput } from './types'
 import { saveRun } from './db'
 
-export function useSSE(state: AppState, dispatch: Dispatch<Action>) {
+export function useSSE(
+  state: AppState,
+  dispatch: Dispatch<Action>,
+  onError: (msg: string) => void,
+) {
   const abortRef = useRef<AbortController | null>(null)
 
   const run = useCallback(
@@ -24,12 +28,13 @@ export function useSSE(state: AppState, dispatch: Dispatch<Action>) {
         const res = await fetch('/api/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idea: state.idea, agents }),
+          body: JSON.stringify({ idea: state.idea, agents, useOpus: state.useOpus }),
           signal: ctrl.signal,
         })
 
         if (!res.ok || !res.body) {
-          throw new Error(`Server error ${res.status}`)
+          const errText = await res.text().catch(() => '')
+          throw new Error(`Server ${res.status}: ${errText || res.statusText}`)
         }
 
         const reader = res.body.getReader()
@@ -47,9 +52,12 @@ export function useSSE(state: AppState, dispatch: Dispatch<Action>) {
           for (const line of lines) {
             const trimmed = line.trim()
             if (!trimmed) continue
+            // SSE format: "data: {...}"
+            const jsonStr = trimmed.startsWith('data: ') ? trimmed.slice(6) : trimmed
+            if (!jsonStr) continue
             let msg: Record<string, unknown>
             try {
-              msg = JSON.parse(trimmed)
+              msg = JSON.parse(jsonStr)
             } catch {
               continue
             }
@@ -112,11 +120,12 @@ export function useSSE(state: AppState, dispatch: Dispatch<Action>) {
         }
       } catch (err) {
         if ((err as Error).name !== 'AbortError') {
-          console.error('SSE error:', err)
+          onError(String((err as Error).message ?? err))
+          dispatch({ type: 'RESET' })
         }
       }
     },
-    [state, dispatch]
+    [state, dispatch, onError]
   )
 
   const abort = useCallback(() => {

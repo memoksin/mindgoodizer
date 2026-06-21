@@ -6,6 +6,15 @@ import type { ServerResponse } from 'node:http'
 
 const TIMEOUT_MS = 90_000
 
+// Model routing — cut usage by matching model tier to task weight.
+const HAIKU_MODEL = 'claude-haiku-4-5-20251001'
+const SONNET_MODEL = 'claude-sonnet-4-6'
+const OPUS_MODEL = 'claude-opus-4-8'
+const ORCHESTRATOR_MODEL = SONNET_MODEL
+// light ideas → cheap Haiku; heavy ideas → Sonnet. Default Opus never used.
+const filterModelFor = (heaviness: 'light' | 'heavy') =>
+  heaviness === 'heavy' ? SONNET_MODEL : HAIKU_MODEL
+
 type AgentId =
   | 'devils_advocate'
   | 'reality_checker'
@@ -126,6 +135,13 @@ Output schema:
   "conflicts": [ { "tension": "<agent A vs agent B>", "resolution": "<your judgment in plain language + why>" } ],
   "roadmap": [ { "phase": "<e.g. Test / Build / Sell>", "action": "<concrete next step in plain language>" } ] }`
 
+function extractJson(raw: string): string {
+  const start = raw.indexOf('{')
+  const end = raw.lastIndexOf('}')
+  if (start === -1 || end === -1 || end < start) return raw
+  return raw.slice(start, end + 1)
+}
+
 type FilterOutput = {
   verdict: 'pass' | 'caution' | 'fail'
   score: number
@@ -184,14 +200,16 @@ Idea: ${idea}`
 function spawnFilterAndAccumulate(
   prompt: string,
   agentId: AgentId,
+  model: string,
   res: ServerResponse,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const proc = spawn('claude', [
       '-p', prompt,
+      '--model', model,
       '--output-format', 'stream-json',
-      '--temperature', '0.7',
-      '--max-tokens', '1500',
+      '--verbose',
+      '--include-partial-messages',
     ])
     const rl = createInterface({ input: proc.stdout })
     let accumulated = ''
@@ -212,13 +230,20 @@ function spawnFilterAndAccumulate(
     rl.on('line', (line: string) => {
       if (!line.trim()) return
       try {
-        const event = JSON.parse(line) as {
+        const msg = JSON.parse(line) as {
           type: string
-          delta?: { type: string; text: string }
+          event?: { type: string; delta?: { type: string; text: string } }
+          result?: string
         }
-        if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
-          accumulated += event.delta.text
-          emit(res, { agent: agentId, type: 'delta', text: event.delta.text })
+        // streamed token deltas are wrapped: { type: 'stream_event', event: { type: 'content_block_delta', delta: {...} } }
+        if (msg.type === 'stream_event' && msg.event?.type === 'content_block_delta' && msg.event.delta?.type === 'text_delta') {
+          const text = msg.event.delta.text
+          accumulated += text
+          emit(res, { agent: agentId, type: 'delta', text })
+        } else if (msg.type === 'result' && !accumulated && typeof msg.result === 'string') {
+          // fallback: no partial deltas arrived, use final result text
+          accumulated = msg.result
+          emit(res, { agent: agentId, type: 'delta', text: msg.result })
         }
       } catch { /* skip malformed lines */ }
     })
@@ -228,12 +253,12 @@ function spawnFilterAndAccumulate(
   })
 }
 
-async function runFilterAgent(agentId: AgentId, idea: string, res: ServerResponse): Promise<AgentResult> {
+async function runFilterAgent(agentId: AgentId, idea: string, model: string, res: ServerResponse): Promise<AgentResult> {
   const prompt = `${SHARED_RULES}\n\n${AGENT_PERSONAS[agentId]}\n\n---\n\nEvaluate this idea:\n\n${idea}`
 
   let raw: string
   try {
-    raw = await spawnFilterAndAccumulate(prompt, agentId, res)
+    raw = await spawnFilterAndAccumulate(prompt, agentId, model, res)
   } catch (err) {
     const message = String(err)
     const reason = message.includes('timeout') ? 'timeout' : 'error'
@@ -241,16 +266,17 @@ async function runFilterAgent(agentId: AgentId, idea: string, res: ServerRespons
     return { ok: false, reason, message }
   }
 
-  emit(res, { agent: agentId, type: 'done', result: raw })
+  const cleaned = extractJson(raw)
+  emit(res, { agent: agentId, type: 'done', result: cleaned })
 
   try {
-    const json = JSON.parse(raw) as FilterOutput
+    const json = JSON.parse(cleaned) as FilterOutput
     return { ok: true, json }
   } catch {
     // one retry on parse failure
     let retryRaw: string
     try {
-      retryRaw = await spawnFilterAndAccumulate(prompt, agentId, res)
+      retryRaw = await spawnFilterAndAccumulate(prompt, agentId, model, res)
     } catch (err) {
       const message = String(err)
       const reason = message.includes('timeout') ? 'timeout' : 'error'
@@ -258,13 +284,14 @@ async function runFilterAgent(agentId: AgentId, idea: string, res: ServerRespons
       return { ok: false, reason, message }
     }
 
-    emit(res, { agent: agentId, type: 'done', result: retryRaw })
+    const retryCleaned = extractJson(retryRaw)
+    emit(res, { agent: agentId, type: 'done', result: retryCleaned })
 
     try {
-      const json = JSON.parse(retryRaw) as FilterOutput
+      const json = JSON.parse(retryCleaned) as FilterOutput
       return { ok: true, json }
     } catch {
-      emit(res, { agent: agentId, type: 'error', message: 'parse_failed after retry' })
+      emit(res, { agent: agentId, type: 'error', message: `parse_failed: ${retryCleaned.slice(0, 200)}` })
       return { ok: false, reason: 'parse_failed', message: 'parse_failed after retry' }
     }
   }
@@ -273,6 +300,7 @@ async function runFilterAgent(agentId: AgentId, idea: string, res: ServerRespons
 async function runOrchestratorAgent(
   idea: string,
   filterResults: Partial<Record<AgentId, AgentResult>>,
+  model: string,
   res: ServerResponse,
 ): Promise<void> {
   const agentSections = (Object.entries(filterResults) as [AgentId, AgentResult][])
@@ -290,9 +318,10 @@ async function runOrchestratorAgent(
   return new Promise((resolve) => {
     const proc = spawn('claude', [
       '-p', prompt,
+      '--model', model,
       '--output-format', 'stream-json',
-      '--temperature', '0.3',
-      '--max-tokens', '2500',
+      '--verbose',
+      '--include-partial-messages',
     ])
     const rl = createInterface({ input: proc.stdout })
     let accumulated = ''
@@ -314,19 +343,24 @@ async function runOrchestratorAgent(
     rl.on('line', (line: string) => {
       if (!line.trim()) return
       try {
-        const event = JSON.parse(line) as {
+        const msg = JSON.parse(line) as {
           type: string
-          delta?: { type: string; text: string }
+          event?: { type: string; delta?: { type: string; text: string } }
+          result?: string
         }
-        if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
-          accumulated += event.delta.text
-          emit(res, { type: 'orchestrator_delta', text: event.delta.text })
+        if (msg.type === 'stream_event' && msg.event?.type === 'content_block_delta' && msg.event.delta?.type === 'text_delta') {
+          const text = msg.event.delta.text
+          accumulated += text
+          emit(res, { type: 'orchestrator_delta', text })
+        } else if (msg.type === 'result' && !accumulated && typeof msg.result === 'string') {
+          accumulated = msg.result
+          emit(res, { type: 'orchestrator_delta', text: msg.result })
         }
       } catch { /* skip malformed lines */ }
     })
 
     proc.on('close', () => {
-      settle(() => emit(res, { type: 'orchestrator_done', result: accumulated }))
+      settle(() => emit(res, { type: 'orchestrator_done', result: extractJson(accumulated) }))
     })
 
     proc.on('error', (err: Error) => {
@@ -340,7 +374,7 @@ const fastify = Fastify({ logger: true })
 await fastify.register(cors, { origin: 'http://localhost:5173' })
 
 fastify.post('/api/run', async (request, reply) => {
-  const body = request.body as { idea?: unknown; agents?: unknown }
+  const body = request.body as { idea?: unknown; agents?: unknown; useOpus?: unknown }
 
   if (typeof body?.idea !== 'string' || body.idea.length < 20) {
     return reply.status(400).send({ error: 'idea must be a string of at least 20 characters' })
@@ -356,6 +390,7 @@ fastify.post('/api/run', async (request, reply) => {
 
   const idea = body.idea
   const agents = body.agents as AgentId[]
+  const useOpus = body.useOpus === true
 
   reply.hijack()
   const raw = reply.raw
@@ -366,11 +401,21 @@ fastify.post('/api/run', async (request, reply) => {
   })
 
   try {
-    const heaviness = await classifyIdea(idea)
-    emit(raw, { type: 'classify', result: heaviness })
+    // Opus mode: skip classifier, filters run on Sonnet, orchestrator goes straight to Opus.
+    let filterModel: string
+    let orchestratorModel: string
+    if (useOpus) {
+      filterModel = SONNET_MODEL
+      orchestratorModel = OPUS_MODEL
+    } else {
+      const heaviness = await classifyIdea(idea)
+      emit(raw, { type: 'classify', result: heaviness })
+      filterModel = filterModelFor(heaviness)
+      orchestratorModel = ORCHESTRATOR_MODEL
+    }
 
     const settled = await Promise.allSettled(
-      agents.map((agentId) => runFilterAgent(agentId, idea, raw))
+      agents.map((agentId) => runFilterAgent(agentId, idea, filterModel, raw))
     )
 
     const filterResults: Partial<Record<AgentId, AgentResult>> = {}
@@ -383,7 +428,7 @@ fastify.post('/api/run', async (request, reply) => {
 
     const successCount = Object.values(filterResults).filter((r) => r?.ok).length
     if (successCount > 0) {
-      await runOrchestratorAgent(idea, filterResults, raw)
+      await runOrchestratorAgent(idea, filterResults, orchestratorModel, raw)
     }
 
     emit(raw, { type: 'complete' })

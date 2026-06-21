@@ -8,8 +8,6 @@ export function Dashboard() {
   const { state, run } = useContext(AppContext)
   const { config, agents, orchestrator, phase } = state
 
-  if (phase === 'config') return null
-
   function handleRetry(id: AgentId) {
     run(id)
   }

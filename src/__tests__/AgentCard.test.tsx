@@ -10,7 +10,7 @@ const baseState = (overrides: Partial<AgentState>): AgentState => ({
 })
 
 describe('AgentCard', () => {
-  it('shows motto when idle', () => {
+  it('shows motto in all states', () => {
     render(<AgentCard id="futurist" agentState={baseState({ status: 'idle' })} onRetry={vi.fn()} isRunning={false} />)
     expect(screen.getByText(/5 years/i)).toBeInTheDocument()
   })

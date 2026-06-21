@@ -63,6 +63,20 @@ export function ControlCenter() {
         </div>
       </div>
 
+      <label className={`opus-toggle ${state.useOpus ? 'opus-toggle--on' : ''}`}>
+        <input
+          type="checkbox"
+          checked={state.useOpus}
+          onChange={() => dispatch({ type: 'TOGGLE_OPUS' })}
+          disabled={isRunning}
+        />
+        <span className="opus-toggle__track"><span className="opus-toggle__thumb" /></span>
+        <span className="opus-toggle__text">
+          Opus orchestrator
+          <small>Max reasoning. Skips classifier, higher cost.</small>
+        </span>
+      </label>
+
       <div className="run-row">
         {state.phase === 'complete' && (
           <button
