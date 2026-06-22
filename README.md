@@ -16,6 +16,12 @@ If something breaks — open an issue or just refresh. PRs welcome.
 
 ## Why
 
+The main reason I built Mindgoodizer is simple: I have a Claude subscription and wanted to use it directly — no API key setup, no extra billing. This tool is built for Claude subscribers. If you have an active Claude subscription, you're ready to go with zero configuration. That's the core difference from other idea-validation tools.
+
+> Other models will be added in future updates (but not very soon).
+
+> **Note on usage limits:** Anthropic is working on a separate usage tier for `claude -p` (the programmatic CLI flag this app relies on). I'm tracking those updates and will update Mindgoodizer's internals once `claude -p` gets its own limit policy.
+
 Most idea-validation tools either coddle you or give generic feedback. Mindgoodizer runs your idea through adversarial specialists in parallel: a Devil's Advocate, a Reality Checker, a Copycat Detector, a Grandma Test, and more. The Orchestrator then reconciles their findings into an honest verdict with blind spots, conflicts, and a roadmap.
 
 No cloud backend. No account. Your API key stays on your machine.

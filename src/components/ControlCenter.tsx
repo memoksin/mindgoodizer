@@ -19,7 +19,7 @@ export function ControlCenter() {
   return (
     <section className="control-center">
       <h1 className="app-title">Mindgoodizer</h1>
-      <p className="app-subtitle">Throw your idea at 7 brutal critics.</p>
+      <p className="app-subtitle">Throw your idea at a panel of brutal critics.</p>
 
       <textarea
         className="idea-input"

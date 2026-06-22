@@ -149,6 +149,7 @@ body {
 .chip--toggle input { display: none; }
 .chip--toggle:hover { border-color: var(--accent); color: var(--text); }
 .chip--on { border-color: var(--accent); color: var(--accent); background: rgba(108,139,255,0.1); }
+.agent-card--toggleable { cursor: pointer; }
 
 .run-row {
   display: flex;
@@ -258,6 +259,30 @@ body {
 .agent-card--idle { opacity: 0.6; }
 .agent-card--error { border-color: var(--fail); }
 .agent-card--timeout { border-color: var(--caution); }
+
+/* Unselected agent: inert preview, dimmed, click to enable */
+.agent-card--off {
+  opacity: 0.45;
+  border-style: dashed;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: opacity 0.2s, border-color 0.2s;
+}
+.agent-card--off:hover:not(:disabled) {
+  opacity: 0.8;
+  border-color: var(--accent);
+}
+.agent-card--off:disabled { cursor: default; }
+
+.badge--off { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+
+.card-enable-hint {
+  font-size: 11px;
+  color: var(--accent);
+  margin-top: auto;
+}
 
 .card-header {
   display: flex;
