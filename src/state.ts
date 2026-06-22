@@ -36,6 +36,18 @@ const ALL_AGENTS: AgentId[] = [
   'grandma_test',
   'copycat_detector',
   'futurist',
+  'hidden_cost_finder',
+  'reversibility_checker',
+  'boredom_predictor',
+  'beginner_blindspot_scanner',
+  'minimum_viable_try',
+  'key_person_risk',
+  'prior_art_checker',
+  'proxy_metric_detector',
+  'thesis_vs_weekend',
+  'real_world_distribution',
+  'metric_validity',
+  'reproducibility_checker',
 ]
 
 const makeAgentMap = (): Record<AgentId, AgentState> =>
