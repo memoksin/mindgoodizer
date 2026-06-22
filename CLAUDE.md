@@ -9,21 +9,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Mindgoodizer is a local-first single-user web app. A user submits a raw project idea; it runs through a pool of critical LLM "filter" agents (Claude API) in parallel, then an Orchestrator synthesizes their verdicts into a final report. No cloud backend, no auth, no multi-user.
+Mindgoodizer is a local-first single-user web app. A user submits a raw project idea; it runs through a pool of critical LLM filter agents in parallel, then an Orchestrator synthesizes their verdicts into a final report. No cloud backend, no auth, no multi-user.
 
 ## Planned Stack
 
 - **Frontend:** Vite + React 18 + TypeScript. State via `useReducer` + context (no Redux — single screen).
-- **Sidecar:** Node + Fastify + `claude` CLI (spawned via `child_process`). One file (`server/index.ts`). Streams via SSE. `ANTHROPIC_API_KEY` consumed by CLI, not SDK.
+- **Sidecar:** Node + Fastify + `claude` CLI (spawned via `child_process`). One file (`server/index.ts`). Streams via SSE. Auth via Claude subscription — no API key needed.
 - **Persistence:** IndexedDB via `idb` (not LocalStorage — reports are large).
 - **Dev runner:** `concurrently` starts both processes.
 
-Why a sidecar instead of pure browser: API key must stay server-side; sidecar owns concurrency, timeouts, and partial-failure handling.
+Why a sidecar instead of pure browser: sidecar owns concurrency, timeouts, and partial-failure handling; `claude` CLI requires a local process.
 
 ## Commands (once implemented)
 
 ```bash
-cp .env.example .env      # add ANTHROPIC_API_KEY
 bun install
 bun run dev               # Vite on :5173 + sidecar on :8787
 ```

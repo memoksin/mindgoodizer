@@ -24,7 +24,7 @@ The main reason I built Mindgoodizer is simple: I have a Claude subscription and
 
 Most idea-validation tools either coddle you or give generic feedback. Mindgoodizer runs your idea through adversarial specialists in parallel: a Devil's Advocate, a Reality Checker, a Copycat Detector, a Grandma Test, and more. The Orchestrator then reconciles their findings into an honest verdict with blind spots, conflicts, and a roadmap.
 
-No cloud backend. No account. Your API key stays on your machine.
+No cloud backend. No account. No API key needed.
 
 ## When to Use
 
@@ -36,13 +36,12 @@ No cloud backend. No account. Your API key stays on your machine.
 
 - **Frontend:** Vite + React 18 + TypeScript
 - **Sidecar:** Node + Fastify (streams agent output via SSE)
-- **LLM:** Claude API via `claude` CLI (spawned by sidecar)
+- **LLM:** `claude` CLI (spawned by sidecar — uses your Claude subscription)
 - **Persistence:** IndexedDB — runs saved locally, no server
 
 ## Setup
 
 ```bash
-cp .env.example .env    # add your ANTHROPIC_API_KEY
 bun install && bun run dev   # Vite on :5173 + sidecar on :8787
 # or
 npm install && npm run dev
