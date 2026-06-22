@@ -1,8 +1,8 @@
 # Mindgoodizer — System Architecture Document (SAD)
 
 Local web app that runs a raw project idea through a pool of critical LLM
-"filter" agents (Claude API) in parallel, then synthesizes their verdicts via an
-Orchestrator. Local-first, single-user, no cloud backend.
+filter agents in parallel, then synthesizes their verdicts via an Orchestrator.
+Local-first, single-user, no cloud backend.
 
 ---
 

@@ -6,7 +6,7 @@
 
 ### 1.1. Project Scaffold
 
-- [x] 1.1.1. Init repo with Vite + React 18 + TypeScript; add Fastify sidecar skeleton; wire `concurrently` dev runner; add `.env.example` with `ANTHROPIC_API_KEY` placeholder.
+- [x] 1.1.1. Init repo with Vite + React 18 + TypeScript; add Fastify sidecar skeleton; wire `concurrently` dev runner.
 
 ### 1.2. Sidecar Core (`server/index.ts`)
 

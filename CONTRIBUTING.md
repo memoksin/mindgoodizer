@@ -8,7 +8,6 @@
 ## Setup
 
 ```bash
-cp .env.example .env   # add ANTHROPIC_API_KEY
 bun install && bun run dev   # Vite :5173 + sidecar :8787
 # or
 npm install && npm run dev
