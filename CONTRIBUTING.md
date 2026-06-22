@@ -8,9 +8,21 @@
 ## Setup
 
 ```bash
-bun install
-bun run dev   # Vite :5173 + sidecar :8787
+cp .env.example .env   # add ANTHROPIC_API_KEY
+bun install && bun run dev   # Vite :5173 + sidecar :8787
+# or
+npm install && npm run dev
 ```
+
+<!-- AUTO-GENERATED from package.json scripts -->
+| Command | Bun | npm |
+|---------|-----|-----|
+| Start dev (both) | `bun run dev` | `npm run dev` |
+| Client only | `bun run dev:client` | `npm run dev:client` |
+| Server only | `bun run dev:server` | `npm run dev:server` |
+| Production build | `bun run build` | `npm run build` |
+| Preview build | `bun run preview` | `npm run preview` |
+<!-- END AUTO-GENERATED -->
 
 ## Commit Style
 
