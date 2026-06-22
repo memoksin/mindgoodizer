@@ -42,8 +42,10 @@ No cloud backend. No account. Your API key stays on your machine.
 ## Setup
 
 ```bash
-bun install
-bun run dev     # Vite on :5173 + sidecar on :8787
+cp .env.example .env    # add your ANTHROPIC_API_KEY
+bun install && bun run dev   # Vite on :5173 + sidecar on :8787
+# or
+npm install && npm run dev
 ```
 
 Open `http://localhost:5173`.
@@ -58,6 +60,8 @@ Open `http://localhost:5173`.
 
 ## Agents
 
+### Core (always run)
+
 | Agent | Lens |
 |---|---|
 | Devil's Advocate | Finds fatal flaws |
@@ -67,7 +71,27 @@ Open `http://localhost:5173`.
 | Copycat Detector | Spots existing competitors |
 | Grandma Test | Checks clarity and accessibility |
 | Futurist | Projects long-term trajectory |
-| **Orchestrator** | Synthesizes all verdicts |
+
+### Niche (opt-in, click to enable)
+
+| Agent | Lens |
+|---|---|
+| The Receipt | Full hidden costs — time, maintenance, emotional labor |
+| No Take-Backs | Lock-ins and one-way doors |
+| Week Four | Will interest survive past the novelty phase? |
+| The Intern | Hidden expertise assumptions |
+| The Napkin Test | Smallest possible real-world test |
+| Hit By A Bus | Single point of human failure |
+| Already On ArXiv | Prior art and abandoned predecessors |
+| Goodhart's Ghost | Proxy metrics that drift from real value |
+| Scope Creep | Weekend project or three-year thesis? |
+| The Demo Effect | Controlled demo vs. messy real-world inputs |
+| The Benchmark Trap | Does the success metric still mean anything? |
+| The Replication Crisis | Could anyone else reproduce the core result? |
+
+### Orchestrator
+
+Runs after all selected agents settle. Synthesizes verdicts into a final report: strengths, blind spots, conflicts, and a roadmap.
 
 ## Requirements
 
