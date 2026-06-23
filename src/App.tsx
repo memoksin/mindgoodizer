@@ -29,7 +29,10 @@ export default function App() {
     <AppContext.Provider value={{ state, dispatch, run }}>
       <div className="app-layout">
         <header className="app-header">
-          <div />
+          <div className="app-brand">
+            <span className="app-wordmark">MINDGOODIZER</span>
+            <span className="app-tagline">Idea Validator</span>
+          </div>
           <HistoryPanel />
         </header>
         {error && (

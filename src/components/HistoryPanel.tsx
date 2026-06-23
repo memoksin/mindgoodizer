@@ -71,7 +71,7 @@ export function HistoryPanel() {
                 <li key={run.id} className="history-item">
                   <button className="history-load" onClick={() => handleLoad(run)}>
                     <span className="history-snippet">
-                      {run.idea.slice(0, 60)}{run.idea.length > 60 ? '…' : ''}
+                      {run.idea.slice(0, 55)}{run.idea.length > 55 ? '…' : ''}
                     </span>
                     <span className="history-meta">
                       <span className={`badge ${VERDICT_CLASS[run.report.overallVerdict]}`}>
