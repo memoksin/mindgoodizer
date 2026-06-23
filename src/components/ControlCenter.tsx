@@ -18,43 +18,86 @@ export function ControlCenter() {
 
   return (
     <section className="control-center">
-      <h1 className="app-title">Mindgoodizer</h1>
-      <p className="app-subtitle">Throw your idea at a panel of brutal critics.</p>
+      <div className="cc-left">
+        <div>
+          <h1 className="cc-heading">Mindgoodizer</h1>
+          <p className="cc-sub">Throw your idea at a panel of brutal critics.</p>
+        </div>
 
-      <textarea
-        className="idea-input"
-        placeholder="Describe your idea… (min 20 chars)"
-        value={state.idea}
-        onChange={(e) => dispatch({ type: 'SET_IDEA', idea: e.target.value })}
-        disabled={isRunning}
-        rows={4}
-      />
+        <textarea
+          className="idea-input"
+          placeholder="Describe your idea… (min 20 chars)"
+          value={state.idea}
+          onChange={(e) => dispatch({ type: 'SET_IDEA', idea: e.target.value })}
+          disabled={isRunning}
+          rows={5}
+        />
 
-      <div className="agents-row">
-        <div className="core-agents">
-          <span className="agents-label">Core (always on)</span>
-          <div className="agent-chips">
+        <label className={`opus-toggle ${state.useOpus ? 'opus-toggle--on' : ''}`}>
+          <input
+            type="checkbox"
+            checked={state.useOpus}
+            onChange={() => dispatch({ type: 'TOGGLE_OPUS' })}
+            disabled={isRunning}
+          />
+          <span className="opus-toggle__track"><span className="opus-toggle__thumb" /></span>
+          <span className="opus-toggle__text">
+            Opus orchestrator
+            <small>Max reasoning. Higher cost.</small>
+          </span>
+        </label>
+
+        <div className="run-row">
+          {state.phase === 'complete' && (
+            <button
+              className="btn btn--ghost"
+              onClick={() => dispatch({ type: 'RESET' })}
+            >
+              New idea
+            </button>
+          )}
+          <button
+            className="btn btn--primary"
+            disabled={!canRun}
+            onClick={() => run()}
+          >
+            {buttonLabel}
+          </button>
+          {state.classification && (
+            <span className={`badge badge--classify badge--${state.classification}`}>
+              {state.classification === 'heavy' ? '⚡ Heavy' : '✦ Light'}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="cc-right">
+        <div>
+          <div className="agents-section-label">Core agents (always on)</div>
+          <div className="core-grid">
             {CORE_AGENTS.map((id) => (
-              <span key={id} className="chip chip--locked">
+              <div key={id} className="core-cell">
+                <span className="core-dot" />
                 {AGENT_LABELS[id]}
-              </span>
+              </div>
             ))}
           </div>
         </div>
 
-        <div className="niche-agents">
-          <span className="agents-label">Niche (optional)</span>
-          <div className="agent-chips">
+        <div>
+          <div className="agents-section-label">Niche agents (optional)</div>
+          <div className="niche-well">
             {NICHE_AGENTS.map((id) => {
               const checked = state.config.includes(id)
               return (
-                <label key={id} className={`chip chip--toggle ${checked ? 'chip--on' : ''}`}>
+                <label key={id} className={`niche-cell ${checked ? 'niche-cell--on' : ''}`}>
                   <input
                     type="checkbox"
                     checked={checked}
                     onChange={() => toggleNiche(id)}
                     disabled={isRunning}
                   />
+                  <span className="niche-dot" />
                   {AGENT_LABELS[id]}
                 </label>
               )
@@ -62,44 +105,6 @@ export function ControlCenter() {
           </div>
         </div>
       </div>
-
-      <label className={`opus-toggle ${state.useOpus ? 'opus-toggle--on' : ''}`}>
-        <input
-          type="checkbox"
-          checked={state.useOpus}
-          onChange={() => dispatch({ type: 'TOGGLE_OPUS' })}
-          disabled={isRunning}
-        />
-        <span className="opus-toggle__track"><span className="opus-toggle__thumb" /></span>
-        <span className="opus-toggle__text">
-          Opus orchestrator
-          <small>Max reasoning. Skips classifier, higher cost.</small>
-        </span>
-      </label>
-
-      <div className="run-row">
-        {state.phase === 'complete' && (
-          <button
-            className="btn btn--ghost"
-            onClick={() => dispatch({ type: 'RESET' })}
-          >
-            New idea
-          </button>
-        )}
-        <button
-          className="btn btn--primary"
-          disabled={!canRun}
-          onClick={() => run()}
-        >
-          {buttonLabel}
-        </button>
-      </div>
-
-      {state.classification && (
-        <span className={`badge badge--classify badge--${state.classification}`}>
-          {state.classification === 'heavy' ? '⚡ Heavy idea' : '✦ Light idea'}
-        </span>
-      )}
     </section>
   )
 }

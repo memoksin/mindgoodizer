@@ -10,14 +10,18 @@ interface Props {
   isRunning: boolean
 }
 
-const VERDICT_CLASS = { pass: 'badge--pass', caution: 'badge--caution', fail: 'badge--fail' }
-const SEVERITY_CLASS = { low: 'finding--low', med: 'finding--med', high: 'finding--high' }
+type Verdict = 'pass' | 'caution' | 'fail'
+type Severity = 'low' | 'med' | 'high'
+
+const SEVERITY_CLASS: Record<Severity, string> = {
+  low: 'finding--low',
+  med: 'finding--med',
+  high: 'finding--high',
+}
 
 export function AgentCard({ id, agentState, selected = true, canToggle = false, onToggle, onRetry, isRunning }: Props) {
   const { status, partial, result, error } = agentState
 
-  // Unselected: show an inert preview (name + motto) so users see what the agent does.
-  // Click to enable when toggling is allowed (niche agent, not mid-run).
   if (!selected) {
     return (
       <button
@@ -37,9 +41,11 @@ export function AgentCard({ id, agentState, selected = true, canToggle = false, 
     )
   }
 
+  const verdictClass = result ? `agent-card--${result.verdict}` : ''
+
   return (
     <div
-      className={`agent-card agent-card--${status}${canToggle && !isRunning ? ' agent-card--toggleable' : ''}`}
+      className={`agent-card agent-card--${status} ${verdictClass}${canToggle && !isRunning ? ' agent-card--toggleable' : ''}`}
       onClick={canToggle && !isRunning ? onToggle : undefined}
       role={canToggle && !isRunning ? 'button' : undefined}
       tabIndex={canToggle && !isRunning ? 0 : undefined}
@@ -48,9 +54,7 @@ export function AgentCard({ id, agentState, selected = true, canToggle = false, 
       <div className="card-header">
         <span className="card-name">{AGENT_LABELS[id]}</span>
         {status === 'done' && result && (
-          <span className={`badge ${VERDICT_CLASS[result.verdict]}`}>
-            {result.verdict} · {result.score}/10
-          </span>
+          <span className="card-score">{result.score}</span>
         )}
         {(status === 'streaming' || (status === 'idle' && isRunning)) && (
           <span className="spinner" aria-label="loading" />
@@ -59,6 +63,15 @@ export function AgentCard({ id, agentState, selected = true, canToggle = false, 
 
       <p className="card-motto">{AGENT_MOTTOS[id]}</p>
 
+      {status === 'done' && result && (
+        <div className="score-bar">
+          <div
+            className={`score-bar__fill score-bar__fill--${result.verdict}`}
+            style={{ width: `${result.score * 10}%` }}
+          />
+        </div>
+      )}
+
       {status === 'streaming' && (
         <pre className="card-stream">{partial}<span className="cursor">▌</span></pre>
       )}
@@ -66,30 +79,33 @@ export function AgentCard({ id, agentState, selected = true, canToggle = false, 
       {status === 'done' && result && (
         <>
           <p className="card-summary">{result.summary}</p>
-          <div className="card-details">
-            {result.findings.length > 0 && (
-              <>
-                <h4>Findings</h4>
-                <ul>
-                  {result.findings.map((f, i) => (
-                    <li key={i} className={`finding ${SEVERITY_CLASS[f.severity]}`}>
-                      <span className="finding-severity">{f.severity}</span> {f.point}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            {result.recommendations.length > 0 && (
-              <>
-                <h4>Recommendations</h4>
-                <ul>
-                  {result.recommendations.map((r, i) => (
-                    <li key={i}>{r}</li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
+
+          {result.findings.length > 0 && (
+            <details className="findings-details">
+              <summary className="findings-summary-toggle">
+                ▸ Findings ({result.findings.length})
+              </summary>
+              <div className="findings-list">
+                {result.findings.map((f, i) => (
+                  <div key={i} className={`finding ${SEVERITY_CLASS[f.severity as Severity]}`}>
+                    <span className="finding-severity">{f.severity.toUpperCase()}</span>
+                    {f.point}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          {result.recommendations.length > 0 && (
+            <div className="recs-section">
+              <div className="recs-label">Recommendations</div>
+              <ul className="recs-list">
+                {result.recommendations.map((r, i) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </>
       )}
 
